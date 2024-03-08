@@ -1,0 +1,14 @@
+{
+  "pins" : [
+    {
+      "identity" : "realhttp",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/mfreiwald/RealHTTP",
+      "state" : {
+        "branch" : "main",
+        "revision" : "974e5c01d7a1383264c957b5a311d14e11387641"
+      }
+    }
+  ],
+  "version" : 2
+}
