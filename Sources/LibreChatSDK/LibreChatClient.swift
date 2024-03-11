@@ -16,14 +16,12 @@ public enum SocialLogin: String {
 public class LibreChatClient {
     let configuration: LibreChatConfiguration
     let client: HTTPClient
-    private let socialLoginHandler: SocialLoginHandler
 
     private let responseLogger = Logger(subsystem: "LibreChatSDK", category: "Response")
 
     public init(configuration: LibreChatConfiguration) {
         self.configuration = configuration
         client = .libreChat(configuration: configuration)
-        socialLoginHandler = SocialLoginHandler(contextProvider: configuration.socialLoginContextProvider)
     }
 
     // MARK: Unauthorized calls
@@ -55,13 +53,6 @@ public class LibreChatClient {
 
         let token = try response.decode(TokenResponse.self, decoder: .iso8601Full)
         client.headers.set(.authorization, "Bearer \(token.token)")
-    }
-
-    public func login(social: SocialLogin) async throws {
-        let (token, refreshToken) = try await socialLoginHandler.authenticate(with: social, baseUrl: configuration.baseUrl, callbackScheme: configuration.callbackScheme, callbackUri: configuration.callbackUri)
-        async let _ = configuration.refreshTokenProvider.updateRefreshToken(refreshToken)
-        client.headers[.cookie] = "refreshToken=\(refreshToken)"
-        client.headers.set(.authorization, "Bearer \(token)")
     }
 
     // MARK: Authorized calls

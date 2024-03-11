@@ -1,4 +1,3 @@
-import AuthenticationServices
 import Foundation
 
 public struct LibreChatConfiguration {
@@ -23,16 +22,14 @@ public struct LibreChatConfiguration {
     public var baseUrl: URL
     public var userAgent: String
     public var refreshTokenProvider: RefreshTokenProvider
-    public var socialLoginContextProvider: ASWebAuthenticationPresentationContextProviding
-    public var callbackScheme: String
-    public var callbackUri: String
 
-    public init(baseUrl: URL, userAgent: String, refreshTokenProvider: RefreshTokenProvider, socialLoginContextProvider: ASWebAuthenticationPresentationContextProviding, callbackScheme: String, callbackUri: String) {
+    public init(
+        baseUrl: URL,
+        userAgent: String,
+        refreshTokenProvider: RefreshTokenProvider
+    ) {
         self.baseUrl = baseUrl
         self.userAgent = userAgent
         self.refreshTokenProvider = refreshTokenProvider
-        self.socialLoginContextProvider = socialLoginContextProvider
-        self.callbackScheme = callbackScheme
-        self.callbackUri = callbackUri
     }
 }
