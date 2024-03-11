@@ -115,7 +115,9 @@ public class LibreChatClient {
 
     public func uploadImage(_ data: Data) async throws -> ChatFile {
         let request = try HTTPRequest(method: .post, "files/images")
-        request.body = .data(data, contentType: .png)
+        let form = HTTPBody.MultipartForm()
+        form.add(data: data, name: "file")
+        request.body = .multipart(form)
         let response = try await fetch(request)
         return try decode(response)
     }
