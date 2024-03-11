@@ -8,8 +8,8 @@ public struct Config: Codable, Equatable, Hashable {
     public let githubLoginEnabled: Bool
     public let googleLoginEnabled: Bool
     public let openidLoginEnabled: Bool
-    public let openidLabel: String
-    public let openidImageUrl: String
+    public let openidLabel: String?
+    public let openidImageUrl: String?
     public let serverDomain: String
     public let emailLoginEnabled: Bool
     public let registrationEnabled: Bool
