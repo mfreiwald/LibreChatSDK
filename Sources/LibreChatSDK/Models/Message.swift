@@ -19,10 +19,19 @@ public struct Message: Codable, Equatable, Hashable {
     public let updatedAt: Date
     public let user: String
     public let finishReason: String?
+    public let files: [FileId]?
 
     private enum CodingKeys: String, CodingKey {
         case id = "_id"
-        case messageId, __v, conversationId, createdAt, endpoint, error, isCreatedByUser, isEdited, model, parentMessageId, sender, text, tokenCount, unfinished, updatedAt, user
+        case messageId, __v, conversationId, createdAt, endpoint, error, isCreatedByUser, isEdited, model, parentMessageId, sender, text, tokenCount, unfinished, updatedAt, user, files
         case finishReason = "finish_reason"
+    }
+
+    public struct FileId: Codable, Equatable, Hashable {
+        public let fileId: String
+
+        private enum CodingKeys: String, CodingKey {
+            case fileId = "file_id"
+        }
     }
 }
