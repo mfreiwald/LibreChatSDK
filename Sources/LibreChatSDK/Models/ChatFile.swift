@@ -17,12 +17,13 @@ public struct ChatFile: Codable {
     public let usage: Int
     public let user: String
     public let width: Int
+    public let message: String?
 
     enum CodingKeys: String, CodingKey {
         case id = "_id"
         case fileId = "file_id"
         case v = "__v"
-        case bytes, context, createdAt, filename, filepath, height, object, source, type, updatedAt, usage, user, width
+        case bytes, context, createdAt, filename, filepath, height, object, source, type, updatedAt, usage, user, width, message
     }
 }
 

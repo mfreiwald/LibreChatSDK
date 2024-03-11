@@ -113,6 +113,13 @@ public class LibreChatClient {
         return json["message"]
     }
 
+    public func uploadImage(_ data: Data) async throws -> ChatFile {
+        let request = try HTTPRequest(method: .post, "files/images")
+        request.body = .data(data, contentType: .png)
+        let response = try await fetch(request)
+        return try decode(response)
+    }
+
     public func ask(
         endpoint: String,
         message: MessageInfo,

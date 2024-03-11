@@ -18,6 +18,7 @@ public struct MessageInfo: Codable {
     public let temperature: Double?
     public let tools: [Tool]?
     public let agentOptions: AgentOptions?
+    public let files: [FileMessageInfo]
 
     public init(
         text: String,
@@ -36,7 +37,8 @@ public struct MessageInfo: Codable {
         isContinued: Bool,
         temperature: Double?,
         tools: [Tool]?,
-        agentOptions: AgentOptions?
+        agentOptions: AgentOptions?,
+        files: [FileMessageInfo]
     ) {
         self.text = text
         self.sender = sender
@@ -55,6 +57,7 @@ public struct MessageInfo: Codable {
         self.temperature = temperature
         self.tools = tools
         self.agentOptions = agentOptions
+        self.files = files
     }
 }
 
@@ -70,5 +73,26 @@ public struct Tool: Codable {
         public let authField: String
         public let label: String
         public let description: String
+    }
+}
+
+public struct FileMessageInfo: Codable {
+    public let fileId: String
+    public let filepath: String
+    public let height: Int
+    public let type: String
+    public let width: Int
+
+    enum CodingKeys: String, CodingKey {
+        case fileId = "file_id"
+        case filepath, height, type, width
+    }
+
+    public init(fileId: String, filepath: String, height: Int, type: String, width: Int) {
+        self.fileId = fileId
+        self.filepath = filepath
+        self.height = height
+        self.type = type
+        self.width = width
     }
 }
