@@ -13,7 +13,7 @@ public struct Conversation: Codable, Equatable, Hashable {
     public let user: String
     public let agentOptions: AgentOptions?
     public let chatGptLabel: String?
-    public let createdAt: String
+    public let createdAt: Date
     public let endpoint: String
     public let frequencyPenalty: Double
     public let messages: [String]
@@ -23,7 +23,7 @@ public struct Conversation: Codable, Equatable, Hashable {
     public let temperature: Double
     public var title: String
     public let top_p: Double
-    public let updatedAt: String
+    public let updatedAt: Date
     public let imageDetail: String?
     public let resendImages: Bool?
 

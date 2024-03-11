@@ -13,7 +13,7 @@ public struct ChatResponse: Codable {
         public let user: String
         public let __v: Int
         public let chatGptLabel: String?
-        public let createdAt: String
+        public let createdAt: Date
         public let endpoint: String
         public let frequency_penalty: Double
         public let imageDetail: String
@@ -25,7 +25,7 @@ public struct ChatResponse: Codable {
         public let temperature: Double
         public let title: String
         public let top_p: Double
-        public let updatedAt: String
+        public let updatedAt: Date
     }
 
     public struct MessageDetail: Codable {
