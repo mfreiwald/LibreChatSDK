@@ -63,6 +63,37 @@ public class LibreChatClient {
         return try decode(response)
     }
 
+    // TOOD: Needs testing..
+    public func keys(name: String, expiresAt: Date, apiKey: String, baseUrl: String?) async throws {
+        struct RequestBody: Encodable {
+            let name: String
+            let expiresAt: Date
+            let value: String
+        }
+
+        let dataBody = RequestBody(
+            name: name,
+            expiresAt: expiresAt,
+            value: "{\"apiKey\":\"\(apiKey)\",\"baseURL\":\"\(baseUrl ?? "")\"}"
+        )
+
+        let data = try JSONEncoder.iso8601Full.encode(dataBody)
+
+        let request = try HTTPRequest(method: .put, "keys")
+        request.body = .data(data, contentType: .json)
+        try await fetch(request)
+    }
+
+    public func keys(_ endpoint: String) async throws -> String? {
+        struct Response: Decodable {
+            let expiresAt: String?
+        }
+        let request = try HTTPRequest("keys", params: ["name": endpoint])
+        let response = try await fetch(request)
+        let value: Response = try decode(response)
+        return value.expiresAt
+    }
+
     public func conversations(pageNumber: Int = 1) async throws -> Conversations {
         let request = try HTTPRequest("convos", params: ["pageNumber": pageNumber])
         let response = try await fetch(request)
@@ -115,23 +146,25 @@ public class LibreChatClient {
 
     public func uploadImage(_ data: Data) async throws -> ChatFile {
         let request = try HTTPRequest(method: .post, "files/images")
-        let form = HTTPBody.MultipartForm()
-        form.add(data: data, name: "file")
-        request.body = .multipart(form)
+        request.body = .multipart({ form in
+            form.add(data: data, name: "file", fileName: "file.png", mimeType: "image/png")
+        })
         let response = try await fetch(request)
         return try decode(response)
     }
 
     public func ask(
         endpoint: String,
-        message: MessageInfo,
-        creationResponse: ((MessageCreationResponse) -> Void)? = nil,
-        queryResponse: ((MessageQueryResponse) -> Void)? = nil
-    ) async throws -> ChatResponse {
+        message: MessageInfo
+    ) async throws -> AskHandler {
         let request = try HTTPRequest(method: .post, URI: "ask/{endpoint}", variables: ["endpoint": endpoint])
         request.body = .json(message)
         
         let req = try await request.urlRequest(inClient: client)
+        let urlString = req.url?.absoluteString ?? ""
+        logger.info("➡️ [\(urlString)]")
+//        logger.info("\(req.headers.asDictionary)")
+
         var (bytes, response) = try await client.session.bytes(for: req)
 
         guard let httpResponse = response as? HTTPURLResponse else { throw HTTPError(.invalidResponse) }
@@ -157,24 +190,7 @@ public class LibreChatClient {
             guard (200..<400).contains(statusCode.rawValue) else { throw HTTPError(.network, code: statusCode) }
         }
 
-        for try await line in bytes.lines {
-            let components = line.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: true)
-            guard components.count == 2, components[0] == "data" else { continue }
-            let message = components[1].trimmingCharacters(in: .whitespacesAndNewlines)
-
-            guard let data = message.data(using: .utf8) else { continue }
-
-            if let messageResponse = try? JSONDecoder.iso8601Full.decode(MessageCreationResponse.self, from: data) {
-                creationResponse?(messageResponse)
-            } else if let userQuery = try? JSONDecoder.iso8601Full.decode(MessageQueryResponse.self, from: data) {
-                queryResponse?(userQuery)
-            } else if let chatResponse = try? JSONDecoder.iso8601Full.decode(ChatResponse.self, from: data) {
-                return chatResponse
-            } else {
-                continue
-            }
-        }
-        throw HTTPError(.other, message: "No final chat response received")
+        return await AskHandler(bytes: bytes)
     }
 
     public func generateConversationTitle(conversationId: String) async throws -> String {
@@ -196,6 +212,13 @@ public class LibreChatClient {
         return try decode(response)
     }
 
+    public func archiveConversation(conversationId: String) async throws -> Conversation {
+        let request = try HTTPRequest(method: .post, "convos/update")
+        request.body = try .json(["arg": ["conversationId": conversationId, "isArchived": true]])
+        let response = try await fetch(request)
+        return try decode(response)
+    }
+
     public func deleteConversation(conversationId: String) async throws -> DeletionResponse {
         let request = try HTTPRequest(method: .post, "convos/clear")
         request.body = .json(["arg": ["conversationId": conversationId, "source": "button"]])
@@ -203,17 +226,23 @@ public class LibreChatClient {
         return try decode(response)
     }
 
+    @discardableResult
     private func fetch(_ request: HTTPRequest) async throws -> HTTPResponse {
+        let urlRquest = try? await request.urlRequest(inClient: client)
+        let urlString = urlRquest?.url?.absoluteString ?? ""
         do {
-            logger.info("➡️ [\(request.url?.relativePath ?? "")]")
+            logger.info("➡️ [\(urlString)]")
+//            if let urlRquest {
+//                logger.info("\(urlRquest.headers.asDictionary)")
+//            }
             let response = try await request.fetch(client)
-            logger.info("⬅️ [\(request.url?.relativePath ?? "")] StatusCode: \(response.statusCode.rawValue) (\(response.statusCode.localizedDescription))")
+            logger.info("⬅️ [\(urlString)] StatusCode: \(response.statusCode.rawValue)")
             return response
         } catch let error as HTTPError {
-            logger.error("⬅️ [\(request.url?.relativePath ?? "")] StatusCode: \(error.statusCode.rawValue) (\(error.statusCode.localizedDescription))")
+            logger.error("⬅️ [\(urlString)] StatusCode: \(error.statusCode.rawValue) (\(error.localizedDescription))")
             throw error
         } catch {
-            logger.error("⬅️ [\(request.url?.relativePath ?? "")] \(error.localizedDescription)")
+            logger.error("⬅️ [\(urlString)] \(error.localizedDescription)")
             throw error
         }
     }
@@ -302,4 +331,90 @@ private func extractRefreshToken(_ header: HTTPHeaders) -> String? {
     guard let refreshTokenPair = setCookie.split(separator: "; ").first(where: { $0.starts(with: "refreshToken=")}) else { return nil }
     guard let refreshToken = refreshTokenPair.split(separator: "=").last else { return nil }
     return String(refreshToken)
+}
+
+public struct ErrorResponse: Error, Decodable {
+    public let text: String
+}
+
+public actor AskHandler {
+    public var creationResponse: MessageCreationResponse {
+        get async throws {
+            for try await value in self.creationResponseStream {
+                return value
+            }
+            throw ErrorResponse(text: "Didn't received any Creation Response")
+        }
+    }
+
+    public var chatResponse: ChatResponse {
+        get async throws {
+            for try await value in self.chatResponseStream {
+                return value
+            }
+            throw ErrorResponse(text: "Didn't received any Chat Response")
+        }
+    }
+
+    private let creationResponseStream: AsyncThrowingStream<MessageCreationResponse, Error>
+    private let creationResponseContinuation: AsyncThrowingStream<MessageCreationResponse, Error>.Continuation
+
+    private var isCreationResponseFinished = false
+
+    private func creationResponseFinished() {
+        isCreationResponseFinished = true
+    }
+
+    public let queryResponseStream: AsyncStream<MessageQueryResponse>
+    private let queryResponseContinuation: AsyncStream<MessageQueryResponse>.Continuation
+
+    private let chatResponseStream: AsyncThrowingStream<ChatResponse, Error>
+    private let chatResponseContinuation: AsyncThrowingStream<ChatResponse, Error>.Continuation
+
+    private var task: Task<Void, Error>?
+
+    init(bytes: URLSession.AsyncBytes) async {
+        (creationResponseStream, creationResponseContinuation) = AsyncThrowingStream.makeStream()
+        (queryResponseStream, queryResponseContinuation) = AsyncStream.makeStream()
+        (chatResponseStream, chatResponseContinuation) = AsyncThrowingStream.makeStream()
+
+        task = Task { try await start(bytes) }
+    }
+
+    deinit {
+        task?.cancel()
+        task = nil
+    }
+
+    private func start(_ bytes: URLSession.AsyncBytes) async throws {
+        for try await line in bytes.lines {
+            let components = line.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: true)
+            guard components.count == 2, components[0] == "data" else { continue } // TODO: Es gibt auch components[0] == "event: message" -> data: {}, "event: error" -> data: {}
+            let message = components[1].trimmingCharacters(in: .whitespacesAndNewlines)
+
+            guard let data = message.data(using: .utf8) else { continue }
+
+            if let messageResponse = try? JSONDecoder.iso8601Full.decode(MessageCreationResponse.self, from: data) {
+                creationResponseContinuation.yield(messageResponse)
+                creationResponseFinished()
+                creationResponseContinuation.finish()
+            } else if let userQuery = try? JSONDecoder.iso8601Full.decode(MessageQueryResponse.self, from: data) {
+
+                queryResponseContinuation.yield(userQuery)
+            } else if let chatResponse = try? JSONDecoder.iso8601Full.decode(ChatResponse.self, from: data) {
+                queryResponseContinuation.finish()
+                chatResponseContinuation.yield(chatResponse)
+                chatResponseContinuation.finish()
+            } else if let errorResponse = try? JSONDecoder.iso8601Full.decode(ErrorResponse.self, from: data) {
+                if isCreationResponseFinished {
+                    queryResponseContinuation.finish()
+                    chatResponseContinuation.finish(throwing: errorResponse)
+                } else {
+                    creationResponseContinuation.finish(throwing: errorResponse)
+                }
+            } else {
+                continue
+            }
+        }
+    }
 }

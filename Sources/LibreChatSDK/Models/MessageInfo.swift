@@ -13,6 +13,7 @@ public struct MessageInfo: Codable {
     public let overrideParentMessageId: String?
     public let model: String
     public let endpoint: String
+    public let endpointType: String?
     public let key: String?
     public let isContinued: Bool
     public let temperature: Double?
@@ -33,6 +34,7 @@ public struct MessageInfo: Codable {
         overrideParentMessageId: String?,
         model: String,
         endpoint: String,
+        endpointType: String?,
         key: String?,
         isContinued: Bool,
         temperature: Double?,
@@ -52,6 +54,7 @@ public struct MessageInfo: Codable {
         self.overrideParentMessageId = overrideParentMessageId
         self.model = model
         self.endpoint = endpoint
+        self.endpointType = endpointType
         self.key = key
         self.isContinued = isContinued
         self.temperature = temperature

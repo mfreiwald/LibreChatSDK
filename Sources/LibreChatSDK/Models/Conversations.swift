@@ -11,10 +11,10 @@ public struct Conversation: Codable, Equatable, Hashable {
     public let id: String
     public let conversationId: String
     public let user: String
-    public let agentOptions: AgentOptions?
     public let chatGptLabel: String?
     public let createdAt: Date
     public let endpoint: String
+    public let endpointType: String?
     public let frequencyPenalty: Double
     public let messages: [String]
     public let model: String
@@ -26,6 +26,8 @@ public struct Conversation: Codable, Equatable, Hashable {
     public let updatedAt: Date
     public let imageDetail: String?
     public let resendImages: Bool?
+    public let agentOptions: AgentOptions?
+    public let isArchived: Bool?
 
     enum CodingKeys: String, CodingKey {
         case id = "_id"
@@ -35,6 +37,7 @@ public struct Conversation: Codable, Equatable, Hashable {
         case chatGptLabel
         case createdAt
         case endpoint
+        case endpointType
         case frequencyPenalty = "frequency_penalty"
         case messages
         case model
@@ -46,6 +49,7 @@ public struct Conversation: Codable, Equatable, Hashable {
         case updatedAt
         case imageDetail
         case resendImages
+        case isArchived
     }
 }
 
