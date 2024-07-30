@@ -11,6 +11,26 @@ public struct EndpointInfo: Codable {
     public let type: String?
     public let userProvideURL: Bool?
     public let modelDisplayLabel: String?
+
+    public init(
+        plugins: [String : String]?,
+        availableAgents: [String]?,
+        userProvide: Bool?,
+        azure: Bool?,
+        order: Int,
+        type: String?,
+        userProvideURL: Bool?,
+        modelDisplayLabel: String?
+    ) {
+        self.plugins = plugins
+        self.availableAgents = availableAgents
+        self.userProvide = userProvide
+        self.azure = azure
+        self.order = order
+        self.type = type
+        self.userProvideURL = userProvideURL
+        self.modelDisplayLabel = modelDisplayLabel
+    }
 }
 
 public extension EndpointInfo {
