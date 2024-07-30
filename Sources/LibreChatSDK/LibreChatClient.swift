@@ -385,6 +385,22 @@ public actor AskHandler {
         task = Task { try await start(bytes) }
     }
 
+    public init(
+        creationResponseStream: AsyncThrowingStream<MessageCreationResponse, Error>,
+        creationResponseContinuation: AsyncThrowingStream<MessageCreationResponse, Error>.Continuation,
+        queryResponseStream: AsyncStream<MessageQueryResponse>,
+        queryResponseContinuation: AsyncStream<MessageQueryResponse>.Continuation,
+        chatResponseStream: AsyncThrowingStream<ChatResponse, Error>,
+        chatResponseContinuation: AsyncThrowingStream<ChatResponse, Error>.Continuation
+    ) {
+        self.creationResponseStream = creationResponseStream
+        self.creationResponseContinuation = creationResponseContinuation
+        self.queryResponseStream = queryResponseStream
+        self.queryResponseContinuation = queryResponseContinuation
+        self.chatResponseStream = chatResponseStream
+        self.chatResponseContinuation = chatResponseContinuation
+    }
+
     deinit {
         task?.cancel()
         task = nil
