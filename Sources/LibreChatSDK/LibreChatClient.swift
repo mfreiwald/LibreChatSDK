@@ -55,6 +55,13 @@ public class LibreChatClient {
         client.headers.set(.authorization, "Bearer \(token.token)")
     }
 
+    public func logout() async throws {
+        let request = try HTTPRequest("auth/logout")
+        try await fetch(request)
+        client.headers[.cookie] = nil
+        client.headers[.authorization] = nil
+    }
+
     // MARK: Authorized calls
 
     public func user() async throws -> User {
