@@ -19,8 +19,13 @@ public struct WebView: UIViewRepresentable {
     }
 
     public func makeUIView(context: Context) -> WKWebView  {
-        let configuartion = WKWebViewConfiguration()
-//        configuartion.websiteDataStore = .nonPersistent()
+        var configuartion = WKWebViewConfiguration()
+
+        let namespaceUUID = UUID(uuidString: "6ba7b811-9dad-11d1-80b4-00c04fd430c8")! // Use a predefined namespace UUID
+        let uuid = generateUUIDv5(namespaceUUID: namespaceUUID, name: url.absoluteString) ?? namespaceUUID
+        logger.debug("URL: \(url.absoluteString)")
+        logger.debug("UUID: \(uuid.uuidString)")
+        configuartion.websiteDataStore = WKWebsiteDataStore(forIdentifier: uuid)
 
         let userScript = WKUserScript(source: getScript(), injectionTime: .atDocumentStart, forMainFrameOnly: false)
         configuartion.userContentController.addUserScript(userScript)
@@ -107,7 +112,12 @@ public struct WebView: NSViewRepresentable {
 
     public func makeNSView(context: Context) -> WKWebView  {
         var configuartion = WKWebViewConfiguration()
-//        configuartion.websiteDataStore = .nonPersistent()
+
+        let namespaceUUID = UUID(uuidString: "6ba7b811-9dad-11d1-80b4-00c04fd430c8")! // Use a predefined namespace UUID
+        let uuid = generateUUIDv5(namespaceUUID: namespaceUUID, name: url.absoluteString) ?? namespaceUUID
+        logger.debug("URL: \(url.absoluteString)")
+        logger.debug("UUID: \(uuid.uuidString)")
+        configuartion.websiteDataStore = WKWebsiteDataStore(forIdentifier: uuid)
 
         let userScript = WKUserScript(source: getScript(), injectionTime: .atDocumentStart, forMainFrameOnly: false)
         configuartion.userContentController.addUserScript(userScript)
@@ -178,3 +188,54 @@ XMLHttpRequest.prototype.open = function() {
 }
 #endif
 #endif
+
+import CryptoKit
+
+func generateUUIDv5(namespaceUUID: UUID, name: String) -> UUID? {
+    // Konvertiere die UUID des Namespace in Bytes.
+    let namespaceUUIDBytes = namespaceUUID.uuid
+
+    // Konvertiere den Namen in Data.
+    guard let nameData = name.data(using: .utf8) else {
+        return nil
+    }
+
+    // Verbinden von namespaceUUIDBytes und nameData.
+    var data = Data()
+    data.append(namespaceUUIDBytes.0)
+    data.append(namespaceUUIDBytes.1)
+    data.append(namespaceUUIDBytes.2)
+    data.append(namespaceUUIDBytes.3)
+    data.append(namespaceUUIDBytes.4)
+    data.append(namespaceUUIDBytes.5)
+    data.append(namespaceUUIDBytes.6)
+    data.append(namespaceUUIDBytes.7)
+    data.append(namespaceUUIDBytes.8)
+    data.append(namespaceUUIDBytes.9)
+    data.append(namespaceUUIDBytes.10)
+    data.append(namespaceUUIDBytes.11)
+    data.append(namespaceUUIDBytes.12)
+    data.append(namespaceUUIDBytes.13)
+    data.append(namespaceUUIDBytes.14)
+    data.append(namespaceUUIDBytes.15)
+    data.append(nameData)
+
+    // SHA1 Hashing
+    let hash = Insecure.SHA1.hash(data: data)
+
+    // Umwandlung des Digest in UUIDv5
+    var uuidBytes: [UInt8] = Array(hash)
+
+    // Set the version to 5
+    uuidBytes[6] &= 0x0F
+    uuidBytes[6] |= 0x50
+
+    // Set the variant to DCE 1.1 (NCS backwards compatible)
+    uuidBytes[8] &= 0x3F
+    uuidBytes[8] |= 0x80
+
+    return UUID(uuid: (
+        uuidBytes[0], uuidBytes[1], uuidBytes[2], uuidBytes[3], uuidBytes[4], uuidBytes[5], uuidBytes[6], uuidBytes[7],
+        uuidBytes[8], uuidBytes[9], uuidBytes[10], uuidBytes[11], uuidBytes[12], uuidBytes[13], uuidBytes[14], uuidBytes[15]
+    ))
+}

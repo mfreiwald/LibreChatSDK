@@ -28,13 +28,13 @@ public class LibreChatClient {
 
     public func config() async throws -> Config {
         let request = try HTTPRequest("config")
-        let response = try await fetch(request)
+        let response = try await fetch(request, authenticationRequired: false)
         return try decode(response)
     }
 
     public func endpoints() async throws -> Endpoints {
         let request = try HTTPRequest("endpoints")
-        let response = try await fetch(request)
+        let response = try await fetch(request, authenticationRequired: false)
         return try decode(response)
     }
 
@@ -44,7 +44,7 @@ public class LibreChatClient {
 
         let response = try await request.fetch(client)
 
-        if let refreshToken = extractRefreshToken(response.headers) {
+        if let refreshToken = extractRefreshToken(response.headers, headerName: .setCookie) {
             async let _ = configuration.refreshTokenProvider.updateRefreshToken(refreshToken)
             client.headers[.cookie] = "refreshToken=\(refreshToken)"
         } else {
@@ -55,14 +55,14 @@ public class LibreChatClient {
         client.headers.set(.authorization, "Bearer \(token.token)")
     }
 
+    // MARK: Authorized calls
+
     public func logout() async throws {
         let request = try HTTPRequest("auth/logout")
         try await fetch(request)
         client.headers[.cookie] = nil
         client.headers[.authorization] = nil
     }
-
-    // MARK: Authorized calls
 
     public func user() async throws -> User {
         let request = try HTTPRequest("user")
@@ -184,7 +184,7 @@ public class LibreChatClient {
             refreshRequest.headers[.cookie] = "refreshToken=\(refreshToken)"
             let refreshResponse = try await refreshRequest.fetch(client)
 
-            if let refreshToken = extractRefreshToken(refreshResponse.headers) {
+            if let refreshToken = extractRefreshToken(refreshResponse.headers, headerName: .setCookie) {
                 async let _ = configuration.refreshTokenProvider.updateRefreshToken(refreshToken)
                 client.headers[.cookie] = "refreshToken=\(refreshToken)"
             }
@@ -234,19 +234,31 @@ public class LibreChatClient {
     }
 
     @discardableResult
-    private func fetch(_ request: HTTPRequest) async throws -> HTTPResponse {
-        let urlRquest = try? await request.urlRequest(inClient: client)
-        let urlString = urlRquest?.url?.absoluteString ?? ""
+    private func fetch(_ request: HTTPRequest, authenticationRequired: Bool = true) async throws -> HTTPResponse {
+        let urlRquest = try await request.urlRequest(inClient: client)
+        
+        let urlString = urlRquest.url?.absoluteString ?? ""
+        logger.info("➡️ [\(urlString)]")
+        logger.debug("\(urlRquest.headers.asDictionary)")
+
+        if authenticationRequired {
+            let refreshToken = extractRefreshToken(urlRquest.headers, headerName: .cookie) ?? ""
+            if refreshToken.isEmpty {
+                if let refreshToken = configuration.refreshTokenProvider.refreshToken(), !refreshToken.isEmpty {
+                    client.headers[.cookie] = "refreshToken=\(refreshToken)"
+                } else {
+                    logger.error("⬅️ [\(urlString)] Authentication requests needs Refreshtoken")
+                    throw HTTPError.init(.sessionError, message: "Authentication requests needs Refreshtoken")
+                }
+            }
+        }
+
         do {
-            logger.info("➡️ [\(urlString)]")
-//            if let urlRquest {
-//                logger.info("\(urlRquest.headers.asDictionary)")
-//            }
             let response = try await request.fetch(client)
             logger.info("⬅️ [\(urlString)] StatusCode: \(response.statusCode.rawValue)")
             return response
         } catch let error as HTTPError {
-            logger.error("⬅️ [\(urlString)] StatusCode: \(error.statusCode.rawValue) (\(error.localizedDescription))")
+            logger.error("⬅️ [\(urlString)] StatusCode: \(error.statusCode.rawValue) (\(error))")
             throw error
         } catch {
             logger.error("⬅️ [\(urlString)] \(error.localizedDescription)")
@@ -298,8 +310,8 @@ extension HTTPClient {
             client.headers[.cookie] = "refreshToken=\(refreshToken)"
         }
 
-
         let authValidator = HTTPAltRequestValidator(statusCodes: [.unauthorized], onProvideAltRequest: { request, response in
+
             // refresh only possible when refeshToken available
             guard let refreshToken = configuration.refreshTokenProvider.refreshToken() else { 
                 return nil
@@ -309,15 +321,21 @@ extension HTTPClient {
             do {
                 let refreshRequest = try HTTPRequest(method: .post, "auth/refresh")
                 refreshRequest.headers[.cookie] = "refreshToken=\(refreshToken)"
-                logger.info("➡️ [\(request.url?.relativePath ?? "")]")
+                logger.info("➡️ [\(refreshRequest.url?.relativePath ?? "")] for [\(request.url?.relativePath ?? "")]")
+                logger.debug("\(refreshRequest.headers.asDictionary)")
+
                 return refreshRequest
             } catch {
                 return nil
             }
         }, onReceiveAltResponse: { request, response in
-            logger.info("⬅️ [\(request.url?.relativePath ?? "")] StatusCode: \(response.statusCode.rawValue) (\(response.statusCode.localizedDescription))")
+            if let error = response.error {
+                logger.info("⬅️ [\(request.url?.relativePath ?? "")] StatusCode: \(response.statusCode.rawValue) (\(error))")
+            } else {
+                logger.info("⬅️ [\(request.url?.relativePath ?? "")] StatusCode: \(response.statusCode.rawValue)")
+            }
 
-            if let refreshToken = extractRefreshToken(response.headers) {
+            if let refreshToken = extractRefreshToken(response.headers, headerName: .setCookie) {
                 async let _ = configuration.refreshTokenProvider.updateRefreshToken(refreshToken)
                 client.headers[.cookie] = "refreshToken=\(refreshToken)"
             }
@@ -333,8 +351,8 @@ extension HTTPClient {
     }
 }
 
-private func extractRefreshToken(_ header: HTTPHeaders) -> String? {
-    guard let setCookie = header[.setCookie] else { return nil }
+private func extractRefreshToken(_ headers: HTTPHeaders, headerName: HTTPHeaders.Element.Name) -> String? {
+    guard let setCookie = headers[.setCookie] else { return nil }
     guard let refreshTokenPair = setCookie.split(separator: "; ").first(where: { $0.starts(with: "refreshToken=")}) else { return nil }
     guard let refreshToken = refreshTokenPair.split(separator: "=").last else { return nil }
     return String(refreshToken)
